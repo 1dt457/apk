@@ -1,0 +1,36 @@
+name: Sonata Release (auto from dl.sonata.skin)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拉取版本信息
+        run: |
+          curl -fsSL "https://dl.sonata.skin/version.json" -o version.json
+          python3 - <<'PY'
+          import json
+          v = json.load(open('version.json'))
+          u = v.get('update', v)
+          with open('env.txt', 'w') as f:
+              f.write(f"VERSION_NAME={u.get('versionName')}\n")
+              f.write(f"FILE_NAME={u.get('fileName')}\n")
+              f.write("NOTES=" + u.get('notes', '').replace('\n', ' | ') + "\n")
+          PY
+          cat env.txt >> "$GITHUB_ENV"
+
+      - name: 下载 APK
+        run: curl -fsSL "https://dl.sonata.skin/${FILE_NAME}" -o "${FILE_NAME}"
+
+      - name: 创建 Release 并上传
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION_NAME }}
+          name: Sonata v${{ env.VERSION_NAME }}
+          body: ${{ env.NOTES }}
+          files: ${{ env.FILE_NAME }}
