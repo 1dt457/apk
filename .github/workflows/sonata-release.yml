@@ -2,6 +2,8 @@ name: Sonata Release (auto from dl.sonata.skin)
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *'
 
 permissions:
   contents: write
@@ -24,10 +26,24 @@ jobs:
           PY
           cat env.txt >> "$GITHUB_ENV"
 
+      - name: 检查该版本是否已发布
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "v${VERSION_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "v${VERSION_NAME} 已发布，跳过本次运行"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: 下载 APK
+        if: steps.check.outputs.skip != 'true'
         run: curl -fsSL "https://dl.sonata.skin/${FILE_NAME}" -o "${FILE_NAME}"
 
       - name: 创建 Release 并上传
+        if: steps.check.outputs.skip != 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.VERSION_NAME }}
