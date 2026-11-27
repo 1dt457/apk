@@ -60,6 +60,10 @@ jobs:
           unzip -t "${FILE_NAME}" >/dev/null
           echo "已下载并校验：$(stat -c%s "${FILE_NAME}") 字节"
 
+      - name: 生成固定名副本
+        if: steps.check.outputs.need_release == 'true'
+        run: cp "${FILE_NAME}" Sonata-latest-arm64-lite.apk
+
       - name: 创建 Release 并上传
         if: steps.check.outputs.need_release == 'true'
         uses: softprops/action-gh-release@v2
@@ -67,14 +71,16 @@ jobs:
           tag_name: v${{ env.VERSION_NAME }}
           name: Sonata v${{ env.VERSION_NAME }}
           body: ${{ env.NOTES }}
-          files: ${{ env.FILE_NAME }}
+          files: |
+            ${{ env.FILE_NAME }}
+            Sonata-latest-arm64-lite.apk
 
       - name: 同步到仓库根目录
         if: steps.check.outputs.need_root == 'true'
         run: |
           shopt -s nullglob
           for f in Sonata-*.apk; do
-            if [ "$f" != "${FILE_NAME}" ]; then
+            if [ "$f" != "${FILE_NAME}" ] && [ "$f" != "Sonata-latest-arm64-lite.apk" ]; then
               git rm -q --ignore-unmatch "$f"
             fi
           done
