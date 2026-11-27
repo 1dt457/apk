@@ -57,7 +57,10 @@ jobs:
       - name: 下载并校验 APK
         if: steps.check.outputs.need_release == 'true' || steps.check.outputs.need_stable == 'true'
         run: |
-          curl -fsSL "https://dl.sonata.skin/${FILE_NAME}?t=$(date +%s)" -o "${FILE_NAME}"
+          # 隧道上行走家宽带，大文件容易被 HTTP/2 流掐断：
+          # --retry 自动重试 + -C - 断点续传（官网 serve.js 已支持 Range），每次重试从断点继续。
+          curl -fL --retry 6 --retry-all-errors --retry-delay 8 -C - \
+            "https://dl.sonata.skin/${FILE_NAME}?t=$(date +%s)" -o "${FILE_NAME}"
           unzip -t "${FILE_NAME}" >/dev/null
           echo "已下载并校验：$(stat -c%s "${FILE_NAME}") 字节"
 
