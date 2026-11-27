@@ -20,7 +20,7 @@ jobs:
     steps:
       - name: 拉取版本信息
         run: |
-          curl -fsSL "https://dl.sonata.skin/version.json" -o version.json
+          curl -fsSL "https://dl.sonata.skin/version.json?t=$(date +%s)" -o version.json
           python3 - <<'PY'
           import json
           v = json.load(open('version.json'))
@@ -57,7 +57,7 @@ jobs:
       - name: 下载并校验 APK
         if: steps.check.outputs.need_release == 'true' || steps.check.outputs.need_stable == 'true'
         run: |
-          curl -fsSL "https://dl.sonata.skin/${FILE_NAME}" -o "${FILE_NAME}"
+          curl -fsSL "https://dl.sonata.skin/${FILE_NAME}?t=$(date +%s)" -o "${FILE_NAME}"
           unzip -t "${FILE_NAME}" >/dev/null
           echo "已下载并校验：$(stat -c%s "${FILE_NAME}") 字节"
 
