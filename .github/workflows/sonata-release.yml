@@ -18,9 +18,6 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - name: 检出仓库
-        uses: actions/checkout@v4
-
       - name: 拉取版本信息
         run: |
           curl -fsSL "https://dl.sonata.skin/version.json" -o version.json
@@ -35,7 +32,7 @@ jobs:
           PY
           cat env.txt >> "$GITHUB_ENV"
 
-      - name: 检查 Release 与根目录状态
+      - name: 检查 Release 状态
         id: check
         env:
           GH_TOKEN: ${{ github.token }}
@@ -56,16 +53,9 @@ jobs:
             echo "need_stable=false" >> "$GITHUB_OUTPUT"
             echo "Release v${VERSION_NAME} 不存在，需要创建"
           fi
-          if [ -f "${FILE_NAME}" ]; then
-            echo "need_root=false" >> "$GITHUB_OUTPUT"
-            echo "根目录已有 ${FILE_NAME}，跳过同步"
-          else
-            echo "need_root=true" >> "$GITHUB_OUTPUT"
-            echo "根目录缺少 ${FILE_NAME}，需要同步"
-          fi
 
       - name: 下载并校验 APK
-        if: steps.check.outputs.need_release == 'true' || steps.check.outputs.need_root == 'true' || steps.check.outputs.need_stable == 'true'
+        if: steps.check.outputs.need_release == 'true' || steps.check.outputs.need_stable == 'true'
         run: |
           curl -fsSL "https://dl.sonata.skin/${FILE_NAME}" -o "${FILE_NAME}"
           unzip -t "${FILE_NAME}" >/dev/null
@@ -91,19 +81,3 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "v${VERSION_NAME}" Sonata-latest-arm64-lite.apk --repo "${GITHUB_REPOSITORY}" --clobber
-
-      - name: 同步到仓库根目录
-        if: steps.check.outputs.need_root == 'true'
-        run: |
-          shopt -s nullglob
-          for f in Sonata-*.apk; do
-            if [ "$f" != "${FILE_NAME}" ] && [ "$f" != "Sonata-latest-arm64-lite.apk" ]; then
-              git rm -q --ignore-unmatch "$f"
-            fi
-          done
-          git add "${FILE_NAME}"
-          git -c user.name="github-actions[bot]" \
-              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-              commit -m "Update APK to v${VERSION_NAME} arm64 lite"
-          git pull --rebase --autostash
-          git push
