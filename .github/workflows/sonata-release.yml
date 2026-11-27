@@ -2,6 +2,8 @@ name: Sonata Release (auto from dl.sonata.skin)
 
 on:
   workflow_dispatch:
+  repository_dispatch:
+    types: [sonata-release]
   schedule:
     - cron: '0 */6 * * *'
 
@@ -41,8 +43,17 @@ jobs:
           if gh release view "v${VERSION_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
             echo "need_release=false" >> "$GITHUB_OUTPUT"
             echo "Release v${VERSION_NAME} 已存在，跳过创建"
+            if gh release view "v${VERSION_NAME}" --repo "${GITHUB_REPOSITORY}" --json assets \
+                 --jq '.assets[].name' | grep -qx "Sonata-latest-arm64-lite.apk"; then
+              echo "need_stable=false" >> "$GITHUB_OUTPUT"
+              echo "固定名附件已存在"
+            else
+              echo "need_stable=true" >> "$GITHUB_OUTPUT"
+              echo "固定名附件缺失，需要补传"
+            fi
           else
             echo "need_release=true" >> "$GITHUB_OUTPUT"
+            echo "need_stable=false" >> "$GITHUB_OUTPUT"
             echo "Release v${VERSION_NAME} 不存在，需要创建"
           fi
           if [ -f "${FILE_NAME}" ]; then
@@ -54,14 +65,14 @@ jobs:
           fi
 
       - name: 下载并校验 APK
-        if: steps.check.outputs.need_release == 'true' || steps.check.outputs.need_root == 'true'
+        if: steps.check.outputs.need_release == 'true' || steps.check.outputs.need_root == 'true' || steps.check.outputs.need_stable == 'true'
         run: |
           curl -fsSL "https://dl.sonata.skin/${FILE_NAME}" -o "${FILE_NAME}"
           unzip -t "${FILE_NAME}" >/dev/null
           echo "已下载并校验：$(stat -c%s "${FILE_NAME}") 字节"
 
       - name: 生成固定名副本
-        if: steps.check.outputs.need_release == 'true'
+        if: steps.check.outputs.need_release == 'true' || steps.check.outputs.need_stable == 'true'
         run: cp "${FILE_NAME}" Sonata-latest-arm64-lite.apk
 
       - name: 创建 Release 并上传
@@ -74,6 +85,12 @@ jobs:
           files: |
             ${{ env.FILE_NAME }}
             Sonata-latest-arm64-lite.apk
+
+      - name: 补传固定名附件
+        if: steps.check.outputs.need_stable == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "v${VERSION_NAME}" Sonata-latest-arm64-lite.apk --repo "${GITHUB_REPOSITORY}" --clobber
 
       - name: 同步到仓库根目录
         if: steps.check.outputs.need_root == 'true'
